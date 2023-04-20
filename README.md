@@ -35,8 +35,8 @@ It may be easiest to build locally and run to generate the rails app with the co
 
 `rails new test-app` generate a test app
 `cd test-app`
-`rails g scaffold hello` generate a full resource and migrations
-`rails db:migrate RAILS_ENV=test` migrate db
+`bundle exec rails g scaffold hello` generate a full resource and migrations
+`bundle exec rails db:migrate RAILS_ENV=test` migrate db
 
 ```bash
 cd test-app
