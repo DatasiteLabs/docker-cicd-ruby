@@ -35,6 +35,8 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+        # with:
+        #   platforms: all
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer

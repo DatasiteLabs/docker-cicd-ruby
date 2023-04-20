@@ -27,12 +27,15 @@ List of install resources used:
 
 ## Generating the test rails app
 
+It may be easiest to build locally and run to generate the rails app with the correct version.
+
 `test-app` is a basic generated rails app to validate the container and dependencies.
 
-`gem install rails -v '5.1.4'` # version is specific to a version test for the ruby version. You should be able to run others if the ruby version is supported.
+`gem install rails -v '5.2.8.1'` # version is specific to a version test for the ruby version. You should be able to run others if the ruby version is supported.
 
 `rails new test-app` generate a test app
-`rails scaffold hello` generate a full resource and migrations
+`cd test-app`
+`rails g scaffold hello` generate a full resource and migrations
 `rails db:migrate RAILS_ENV=test` migrate db
 
 ```bash
