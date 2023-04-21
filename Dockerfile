@@ -50,7 +50,8 @@ RUN apk add --update --no-cache \
     tar \
     dumb-init \
     bash \
-    openrc
+    openrc \
+    openssl
 
 RUN apk add --update --no-cache nodejs=18.16.0-r1 --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
     && apk add --update --no-cache npm \
