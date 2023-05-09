@@ -16,7 +16,7 @@ env:
   REGISTRY: docker.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: datasite/docker-cicd-ruby
-  TEST_TAG: datasite/test-cicd-ruby:latest-ruby
+  TEST_TAG: 0.0.0.0:5000/datasite/test-cicd-ruby:latest-ruby
 
 jobs:
   build:
@@ -28,6 +28,12 @@ jobs:
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
+
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
 
     steps:
       - name: Checkout repository
@@ -75,15 +81,16 @@ jobs:
         uses: docker/build-push-action@v3.3.1
         with:
           context: .
-          # platforms: linux/amd64,linux/arm64
-          load: true
-          tags: ${{ env.TEST_TAG }}
+          platforms: linux/amd64,linux/arm64
+          # push to local registry for multi platform support
+          push: true
+          tags: "${{ env.TEST_TAG }}"
 
       - name: Test
         id: test
         # I would rather run rootless or as 'ruby' user like jenkins does, that is problematic here
         run: |
-          docker build -t "test-cicd-ruby-consumer" "$(realpath .)/test-app"
+          docker build -t "test-cicd-ruby-consumer" --build-arg=DOCKER_REPO=localhost:5000 "$(realpath .)/test-app"
           docker run --rm --user ruby test-cicd-ruby-consumer
 
       - name: Push
@@ -91,7 +98,7 @@ jobs:
         uses: docker/build-push-action@v3.3.1
         with:
           context: .
-          # platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -1,4 +1,7 @@
-FROM ruby:2.7-alpine
+FROM --platform=$BUILDPLATFORM ruby:2.7-alpine
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
 LABEL version="0.0.1" maintainer="Kayla Altepeter"
 ENV GH_CLI_VERSION 2.27.0
 ENV SQLITE_VERSION 3410200

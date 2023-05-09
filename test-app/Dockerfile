@@ -1,4 +1,5 @@
-FROM datasite/test-cicd-ruby:latest-ruby
+ARG DOCKER_REPO
+FROM ${DOCKER_REPO}/datasite/test-cicd-ruby:latest-ruby
 
 COPY --chown=ruby ./ /usr/src/test-app
 WORKDIR /usr/src/test-app
