@@ -1,10 +1,11 @@
 FROM --platform=$BUILDPLATFORM ruby:2.7-alpine
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
+ARG TARGETARCH
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM with $TARGETARCH"
 LABEL version="0.0.1" maintainer="Kayla Altepeter"
-ENV GH_CLI_VERSION 2.27.0
-ENV SQLITE_VERSION 3410200
+# ENV GH_CLI_VERSION 2.27.0
+ENV NODE_VERSION 18.9.1-r0
 
 # FROM node:18-alpine3.16 AS node
 # COPY --from=node /usr/lib /usr/lib
@@ -13,8 +14,7 @@ ENV SQLITE_VERSION 3410200
 # COPY --from=node /usr/local/include /usr/local/include
 # COPY --from=node /usr/local/bin /usr/local/bin
 
-RUN apk add --update --no-cache mkcert --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing
-RUN apk add --update --no-cache github-cli --repository=https://alpine.pkgs.org/3.17/alpine-community-aarch64/
+RUN apk update --no-cache
 
 RUN apk add --update --no-cache \
     # rails deps
@@ -54,10 +54,17 @@ RUN apk add --update --no-cache \
     dumb-init \
     bash \
     openrc \
-    openssl
+    openssl \
+    file \
+    imagemagick \
+    github-cli
 
-RUN apk add --update --no-cache nodejs=18.16.0-r1 --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    && apk add --update --no-cache npm \
+# RUN apk add --no-cache mkcert --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing
+RUN curl -JLO "https://dl.filippo.io/mkcert/latest?for=${TARGETPLATFORM}" \
+    && chmod +x mkcert-v*-linux-* \
+    && cp mkcert-v*-linux-* /usr/local/bin/mkcert
+
+RUN apk add --update --no-cache nodejs-current=${NODE_VERSION} npm \
     && npm install --global yarn
 
 RUN addgroup --gid 1000 --system ruby && \

@@ -16,7 +16,8 @@ env:
   REGISTRY: docker.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: datasite/docker-cicd-ruby
-  TEST_TAG: 0.0.0.0:5000/datasite/test-cicd-ruby:latest-ruby
+  TEST_TAG: localhost:5000/datasite/test-cicd-ruby:latest-ruby
+  TEST_CONSUMER_TAG: test-cicd-ruby-consumer
 
 jobs:
   build:
@@ -48,13 +49,15 @@ jobs:
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
         if: github.event_name != 'pull_request'
-        # You may pin to the exact commit or the version.
-        # uses: sigstore/cosign-installer@9e9de2292db7abb3f51b7f4808d98f0d347a8919
-        uses: sigstore/cosign-installer@v3.0.2
+        uses: sigstore/cosign-installer@v3.1.0
+        with:
+          cosign-release: 'v2.1.0'
 
       # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: network=host
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
@@ -76,38 +79,45 @@ jobs:
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
-      - name: Build and export to Docker
+      - name: Build and export container to Docker
         id: docker-build
-        uses: docker/build-push-action@v3.3.1
+        uses: docker/build-push-action@v3
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           # push to local registry for multi platform support
           push: true
           tags: "${{ env.TEST_TAG }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and export consumer test container to Docker
+        id: docker-build-consumer
+        uses: docker/build-push-action@v3
+        with:
+          context: ./test-app
+          platforms: linux/amd64
+          build-args: DOCKER_REPO=localhost:5000
+          load: true
+          tags: ${{ env.TEST_CONSUMER_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Test
         id: test
         # I would rather run rootless or as 'ruby' user like jenkins does, that is problematic here
         run: |
-          docker build -t "test-cicd-ruby-consumer" --build-arg=DOCKER_REPO=localhost:5000 "$(realpath .)/test-app"
-          docker run --rm --user ruby test-cicd-ruby-consumer
+          docker run --rm --user ruby ${{ env.TEST_CONSUMER_TAG }}
 
       - name: Push
         id: docker-push
-        uses: docker/build-push-action@v3.3.1
+        uses: docker/build-push-action@v4
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Write signing key to disk
-        run: 'echo "$KEY" > cosign.key'
-        shell: bash
-        env:
-          KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -116,15 +126,26 @@ jobs:
       # https://github.com/sigstore/cosign
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign --key env://COSIGN_PRIVATE_KEY {}@${{ steps.docker-push.outputs.digest }}
         env:
-          TAGS: ${{ steps.docker_meta.outputs.tags }}
-          COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
-          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
-        # env:
-          # COSIGN_EXPERIMENTAL: "true"
+          COSIGN_EXPERIMENTAL: "true"
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.docker-push.outputs.digest }}
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
-        # run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push.outputs.digest }}
-        # run:  echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.docker-push.outputs.digest }}
+        run: cosign sign --yes "${TAGS}@${DIGEST}"
+
+      - name: Rollback Release
+        if: ${{ (cancelled() || failure()) && github.event_name == 'release' }}
+        uses: author/action-rollback@stable
+        with:
+          tag: ${{ github.ref }}
+          delete_orphan_tag: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup Failed Docker Container
+        if: ${{ (cancelled() || failure()) && github.event_name == 'release' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker rmi --force "${ IMAGE_NAME }:${ VERSION }"
