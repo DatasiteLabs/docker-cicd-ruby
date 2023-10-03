@@ -6,6 +6,7 @@ RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM with $TAR
 LABEL version="0.0.1" maintainer="Kayla Altepeter"
 # ENV GH_CLI_VERSION 2.27.0
 ENV NODE_VERSION 18.9.1-r0
+ENV PYTHON_VERSION ~3.10
 
 # FROM node:18-alpine3.16 AS node
 # COPY --from=node /usr/lib /usr/lib
@@ -21,6 +22,7 @@ RUN apk add --update --no-cache \
     pkgconfig \
     libxslt-dev \
     libxml2-dev \
+    libffi \
     build-base \
     ruby-dev \
     libpq-dev \
@@ -66,6 +68,9 @@ RUN curl -JLO "https://dl.filippo.io/mkcert/latest?for=${TARGETPLATFORM}" \
 
 RUN apk add --update --no-cache nodejs-current=${NODE_VERSION} npm \
     && npm install --global yarn
+
+RUN apk add --update --no-cache python3=${PYTHON_VERSION} && ln -sf python3 /usr/bin/python
+RUN python3 -m ensurepip
 
 RUN addgroup --gid 1000 --system ruby && \
 	adduser --uid 1000 --system ruby --ingroup ruby
